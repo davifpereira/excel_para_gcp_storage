@@ -6,9 +6,19 @@ authors = [
     {name = "Davi",email = "davifpereira@yahoo.com.br"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 dependencies = [
-    "pre-commit (>=4.2.0,<5.0.0)"
+    "pre-commit (>=4.2.0,<5.0.0)",
+    "pandas (>=2.2.3,<3.0.0)",
+    "poetry-plugin-dotenv (>=2.9.0,<3.0.0)",
+    "openpyxl (>=3.1.5,<4.0.0)",
+    "mkdocs (>=1.6.1,<2.0.0)",
+    "mkdocs-mermaid2-plugin (>=1.2.1,<2.0.0)",
+    "mkdocstrings[python] (>=0.29.1,<0.30.0)",
+    "taskipy (>=1.14.1,<2.0.0)",
+    "isort (>=6.0.1,<7.0.0)",
+    "black (>=25.1.0,<26.0.0)",
+    "pytest (>=8.3.5,<9.0.0)"
 ]
 
 [tool.poetry]
@@ -23,3 +33,14 @@ build-backend = "poetry.core.masonry.api"
 profile = "black"
 known_third_party = []
 
+[tool.taskipy.tasks]
+format = """
+isort .
+black .
+"""
+kill = "kill -9 $(lsof -t -i :8000)"
+test = "pytest -v"
+run = """
+python3 app/main.py
+"""
+doc = "mkdocs serve"
