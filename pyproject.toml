@@ -18,11 +18,13 @@ dependencies = [
     "taskipy (>=1.14.1,<2.0.0)",
     "isort (>=6.0.1,<7.0.0)",
     "black (>=25.1.0,<26.0.0)",
-    "pytest (>=8.3.5,<9.0.0)"
+    "pytest (>=8.3.5,<9.0.0)",
+    "dotenv (>=0.9.9,<0.10.0)",
+    "pandera (>=0.23.1,<0.24.0)"
 ]
 
 [tool.poetry]
-packages = [{include = "excel_para_gcp_storage", from = "src"}]
+packages = [{include = "excel_para_gcp_storage", from = "app"}]
 
 
 [build-system]
@@ -33,13 +35,16 @@ build-backend = "poetry.core.masonry.api"
 profile = "black"
 known_third_party = []
 
+[tool.bandit]
+exclude_dirs = ["tests"]
+
 [tool.taskipy.tasks]
 format = """
 isort .
 black .
 """
 kill = "kill -9 $(lsof -t -i :8000)"
-test = "pytest -v"
+test = "pytest tests -v"
 run = """
 python3 app/main.py
 """
