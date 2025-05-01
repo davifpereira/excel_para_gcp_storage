@@ -1,20 +1,35 @@
-from datetime import date
-
 import pandera as pa
-from pandera import Field
 from pandera.typing import Series
 
+# Contrato de dados
 
-class SchemaClassifCredito(pa.SchemaModel):
-    data: Series[date] = Field(alias="DATA_AVALIACAO")
-    revisor: Series[str] = Field(alias="REVISOR")
-    id_do_cliente: Series[int] = Field(alias="ID do Cliente")
-    nome_da_pessoa: Series[str] = Field(alias="Nome da Pessoa")
-    analista_1: Series[int] = Field(alias="Analista 1", ge=0)
-    analista_2: Series[int] = Field(alias="Analista 2", ge=0, nullable=True)
-    gerente: Series[int] = Field(alias="Gerente", ge=0)
-    score_externo: Series[int] = Field(alias="Score Externo", ge=0)
+
+# Schema para a tabela de classificação de crédito dos clientes
+class SchemaClassifCredito(pa.DataFrameModel):
+    ID_CLIENTE: Series[int]
+    NOME_PESSOA: Series[str]
+    AGENTE: Series[str]
+    SCORE: Series[float] = pa.Field(ge=0, nullable=True)
+    DATA_AVALIACAO: Series[pa.DateTime]
+    REVISOR: Series[str]
+    PESO_PERCENTUAL: Series[float] = pa.Field(ge=0.05, le=0.95)
 
     class Config:
-        coerce = True
         strict = True
+        coerce = True
+
+
+# Schema para a tabela de avaliação de fornecedores
+class SchemaAvaliacaoForn(pa.DataFrameModel):
+    ID_FORNECEDOR: Series[int]
+    NOME_FORNECEDOR: Series[str]
+    DATA_INSPECAO: Series[pa.DateTime]
+    AGENTE: Series[str]
+    SCORE: Series[float] = pa.Field(ge=0, nullable=True)
+    DATA_AVALIACAO: Series[pa.DateTime]
+    REVISOR: Series[str]
+    PESO_PERCENTUAL: Series[float] = pa.Field(ge=0.05, le=0.95)
+
+    class Config:
+        strict = True
+        coerce = True
