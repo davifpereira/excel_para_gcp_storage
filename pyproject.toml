@@ -20,7 +20,9 @@ dependencies = [
     "black (>=25.1.0,<26.0.0)",
     "pytest (>=8.3.5,<9.0.0)",
     "dotenv (>=0.9.9,<0.10.0)",
-    "pandera (>=0.23.1,<0.24.0)"
+    "pandera (>=0.23.1,<0.24.0)",
+    "google-cloud-bigquery (>=3.31.0,<4.0.0)",
+    "pyarrow (>=20.0.0,<21.0.0)"
 ]
 
 [tool.poetry]
@@ -35,17 +37,17 @@ build-backend = "poetry.core.masonry.api"
 profile = "black"
 known_third_party = []
 
-[tool.bandit]
-exclude_dirs = ["tests"]
-
 [tool.taskipy.tasks]
 format = """
 isort .
 black .
 """
 kill = "kill -9 $(lsof -t -i :8000)"
-test = "pytest tests -v"
+test = "pytest -v"
 run = """
-python3 app/main.py
+poetry run python app/main.py
 """
 doc = "mkdocs serve"
+
+[tool.pytest.ini_options]
+pythonpath = ["app"]
