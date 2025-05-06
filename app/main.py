@@ -1,11 +1,11 @@
 import os
 
-import pandas as pd
 from dotenv import load_dotenv
-from pandera.errors import SchemaError
-from schema import SchemaAvaliacaoForn, SchemaClassifCredito
+from etl import CarregarDadosBigQuery, LerArquivo, TratarDataframe
 
-# Variáveis gerais
+id_conjunto_dados_bigquery = os.getenv("ID_CONJUNTO_DADOS_BIGQUERY")
+
+##### Variáveis gerais
 
 load_dotenv()
 
@@ -17,185 +17,14 @@ col_valores_classif_credito = ["Analista 1", "Analista 2", "Gerente", "Score Ext
 
 # Arquivo de Suprimentos e Qualidade: Avaliação de fornecedores
 caminho_avaliacao_forn = os.getenv("CAMINHO_EXCEL_AVALIACAO_FORNECEDORES")
+
 nome_tabela_avaliacao_forn = "excel_avaliacao_fornecedores_"
 
 
-# Funções
+id_conjunto_dados_bigquery = os.getenv("ID_CONJUNTO_DADOS_BIGQUERY")
 
-
-def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
-    """
-    Função destinada a leitura primária do arquivo Excel,
-    cujo objetivo é retornar um dicionario contendo alguns metadados e
-    um dataframe com os dados tabulares
-    """
-
-    df = pd.read_excel(caminho, sheet_name=aba, header=None)
-
-    conteudo_planilha = {}
-
-    metadados = {
-        "Data:": "DATA_AVALIACAO",
-        "Revisor:": "REVISOR",
-        coluna_dados: "DADOS",
-    }
-
-    # Pesquisa coluna a coluna para encontrar em qual está as palavras chaves do dicionario acima
-    for nome_col, col_chave in metadados.items():
-
-        for col in df.columns:
-
-            # Verifica se a palavra chave está presente na coluna iterada
-            check_metadados = df[col].astype(str).str.contains(nome_col, na=False)
-
-            # caso sim, guarda o número da coluna e da linha
-            if check_metadados.any():
-
-                coluna = col + 1
-                linha = df[check_metadados].index[0]
-
-                # Guarda num dicionário a data de avaliação, o revisor e os dados de avaliação
-                if nome_col == coluna_dados:
-
-                    # Dados de avaliação
-                    df_selecionado = df.iloc[linha - 1 :, col:].reset_index(drop=True)
-
-                    conteudo_planilha[col_chave] = df_selecionado
-
-                else:
-
-                    resultado = df.iloc[linha, coluna]
-
-                    # Data de avaliação e Revisor
-                    if col_chave == "DATA_AVALIACAO":
-
-                        resultado = pd.to_datetime(resultado, format="%d/%m/%Y").date()
-
-                    conteudo_planilha[col_chave] = resultado
-
-                break
-
-        # Retém ainda o caminho do arquivo
-        conteudo_planilha["CAMINHO"] = caminho
-
-    return conteudo_planilha
-
-
-def TratarDataframe(
-    conteudo: dict, colunas_base: list, colunas_valores: list
-) -> pd.DataFrame:
-    """
-    É resposável pelo tratamento dos dados com base nestas ações:
-
-    - Elabora um dataframe para concetrar o peso percentual da avaliação de cada agente;
-    - Delimita o dataframe principal (aquele que contém os dados das avaliações, propriamente);
-    - Transforma as colunas de agentes e suas avaliações em linhas (unpivot);
-    - Realiza o merge do dataframe principal com o de pesos percentuais;
-    - Inclui duas colunas no dataframe: data de avaliação e revisor.
-    """
-    tabela = {}
-
-    # O objetivo desse diconário é
-    caminho_raiz_nome_arquivos = {
-        caminho_classif_credito: nome_tabela_classif_credito,
-        caminho_avaliacao_forn: nome_tabela_avaliacao_forn,
-    }
-
-    # Dicionário que será destinado à alteração do nome das colunas
-    altera_nome_colunas = {
-        "ID do Cliente": "ID_CLIENTE",
-        "Nome da Pessoa": "NOME_PESSOA",
-    }
-
-    # Seleciona os dados de avaliação,
-    # para iniciar a separação dos critérios percentuais e
-    # das avaliações, propriamente
-    df = conteudo["DADOS"]
-
-    # Dados dos critérios percentuais
-    df_criterios = df.iloc[0:2]
-
-    # Realiza essa iteração para excluir os dados nulos
-    for col in df_criterios.columns:
-
-        check_criterios = (
-            df_criterios[col].astype(str).str.contains("Critérios", na=False)
-        )
-
-        if check_criterios.any():
-
-            coluna = col + 1
-
-            df_criterios = df.iloc[0:2, coluna:]
-            df_criterios.columns = df_criterios.iloc[1]
-            df_criterios = df_criterios.iloc[0:1].reset_index(drop=True)
-
-            break
-
-    df_criterios = pd.melt(
-        frame=df_criterios,
-        value_vars=df_criterios.columns,
-        var_name="AGENTE",
-        value_name="PESO_PERCENTUAL",
-    )
-
-    # Tabela dos dados de avaliação
-    df.columns = df.iloc[1]
-    df_tabela_dados = df[2:].reset_index(drop=True)
-
-    df_tabela_dados = df_tabela_dados.rename(columns=altera_nome_colunas)
-
-    df_tabela_dados = pd.melt(
-        frame=df_tabela_dados,
-        id_vars=colunas_base,
-        value_vars=colunas_valores,
-        var_name="AGENTE",
-        value_name="SCORE",
-    )
-
-    # Junta a tabela dos dados de avaliação com a que contém
-    # o peso percentual da avaliação de cada agente
-    df_tabela_dados = df_tabela_dados.merge(right=df_criterios, on="AGENTE")
-
-    # Incluir uma coluna para a data de avaliação
-    data_avaliacao = conteudo["DATA_AVALIACAO"]
-    df_tabela_dados["DATA_AVALIACAO"] = data_avaliacao
-
-    # Inclui uma coluna para o revisor da avaliação
-    revisor = conteudo["REVISOR"]
-    df_tabela_dados["REVISOR"] = revisor
-
-    # Define o nome que a tabela terá no data warehouse
-    caminho_arquivo = conteudo["CAMINHO"]
-    raiz_nome_arquivo = caminho_raiz_nome_arquivos[caminho_arquivo]
-    nome_arquivo = raiz_nome_arquivo + data_avaliacao.strftime("%Y_%m_%d")
-
-    # Valida os contratos de dados
-    try:
-        if raiz_nome_arquivo == nome_tabela_classif_credito:
-
-            SchemaClassifCredito.validate(df_tabela_dados)
-
-        elif raiz_nome_arquivo == nome_tabela_avaliacao_forn:
-
-            SchemaAvaliacaoForn.validate(df_tabela_dados)
-
-    except SchemaError as e:
-        print(f"Falha na validação do esquema: {e}")
-
-    tabela[nome_arquivo] = df_tabela_dados
-
-    return tabela
-
-
-if __name__ == "__main__":
-
-    conteudo_classif_credito = LerArquivo(
-        caminho=caminho_classif_credito, aba="Dados", coluna_dados="ID do Cliente"
-    )
-
-    df_classificacao_credito = TratarDataframe(
-        conteudo=conteudo_classif_credito,
-        colunas_base=col_base_classif_credito,
-        colunas_valores=col_valores_classif_credito,
-    )
+# O objetivo deste dicionário é criar o nome da tabela que será salva no big query
+caminho_raiz_nome_arquivos = {
+    caminho_classif_credito: nome_tabela_classif_credito,
+    caminho_avaliacao_forn: nome_tabela_avaliacao_forn,
+}
