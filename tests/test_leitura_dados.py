@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from app.main import LerArquivo
+from app.etl import LerArquivo
 
 
 # Teste da primeira função do script main

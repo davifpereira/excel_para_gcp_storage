@@ -2,7 +2,7 @@ from datetime import date
 
 import pandas as pd
 
-from app.main import TratarDataframe
+from app.etl import TratarDataframe
 
 
 # Teste da segunda função do script main
