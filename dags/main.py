@@ -1,7 +1,10 @@
 import os
+from datetime import datetime
 
+from airflow.decorators import dag, task
 from dotenv import load_dotenv
-from etl import CarregarDadosBigQuery, LerArquivo, TratarDataframe
+
+from app.etl import CarregarDadosBigQuery, LerArquivo, TratarDataframe
 
 id_conjunto_dados_bigquery = os.getenv("ID_CONJUNTO_DADOS_BIGQUERY")
 
