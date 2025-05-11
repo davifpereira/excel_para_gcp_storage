@@ -1,7 +1,15 @@
+import os
+
 import pandas as pd
+from dotenv import load_dotenv
 from google.cloud import bigquery
 from pandera.errors import SchemaError
-from schema import SchemaAvaliacaoForn, SchemaClassifCredito
+
+from app.schema import SchemaAvaliacaoForn, SchemaClassifCredito
+
+load_dotenv()
+
+id_conjunto_dados_bigquery = os.getenv("ID_CONJUNTO_DADOS_BIGQUERY")
 
 ##### Funções
 
@@ -13,7 +21,7 @@ def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
     um dataframe com os dados tabulares
     """
 
-    df = pd.read_excel(caminho, sheet_name=aba, header=None)
+    df = pd.read_excel(caminho, sheet_name=aba, header=None, dtype=str)
 
     conteudo_planilha = {}
 
@@ -29,7 +37,7 @@ def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
         for col in df.columns:
 
             # Verifica se a palavra chave está presente na coluna iterada
-            check_metadados = df[col].astype(str).str.contains(nome_col, na=False)
+            check_metadados = df[col].str.contains(nome_col, na=False)
 
             # caso sim, guarda o número da coluna e da linha
             if check_metadados.any():
@@ -52,7 +60,7 @@ def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
                     # Data de avaliação e Revisor
                     if col_chave == "DATA_AVALIACAO":
 
-                        resultado = pd.to_datetime(resultado, format="%d/%m/%Y").date()
+                        resultado = pd.to_datetime(resultado).date()
 
                     conteudo_planilha[col_chave] = resultado
 
@@ -162,9 +170,7 @@ def TratarDataframe(
     return nome_arquivo, df_tabela_dados
 
 
-def CarregarDadosBigQuery(
-    dataframe: pd.DataFrame, id_conjunto_dados_bigquery: str, nome_tabela: str
-):
+def CarregarDadosBigQuery(dataframe: pd.DataFrame, nome_tabela: str):
     """
     Cria uma tabela no Google Big Query para gravar dados oriundos de um dataframe
     """
