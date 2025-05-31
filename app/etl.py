@@ -4,23 +4,42 @@ import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import bigquery
 from pandera.errors import SchemaError
-
+from functools import wraps
 from app.schema import SchemaAvaliacaoForn, SchemaClassifCredito
+import logging
 
 load_dotenv()
 
 id_conjunto_dados_bigquery = os.getenv("ID_CONJUNTO_DADOS_BIGQUERY")
 
+logger = logging.getLogger("airflow.task")
+
 ##### Funções
 
+def capturar_erros(funcao):
 
-def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
+    @wraps(funcao)
+    def wrapper(*args, **kwargs):
+        try:
+
+            return funcao(*args, **kwargs)
+        
+        except Exception as e:
+
+            logger.error(f"Ocorreu um erro na função '{funcao.__name__}':\n\n{e}")
+
+            raise SystemExit()
+
+    return wrapper
+
+
+def ler_arquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
     """
     Função destinada a leitura primária do arquivo Excel,
     cujo objetivo é retornar um dicionario contendo alguns metadados e
     um dataframe com os dados tabulares
     """
-
+    
     df = pd.read_excel(caminho, sheet_name=aba, header=None, dtype=str)
 
     conteudo_planilha = {}
@@ -72,7 +91,8 @@ def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
     return conteudo_planilha
 
 
-def TratarDataframe(
+@capturar_erros
+def tratar_dataframe(
     conteudo: dict, colunas_base: list, colunas_valores: list, nome_tabela: dict
 ) -> pd.DataFrame:
     """
@@ -89,6 +109,9 @@ def TratarDataframe(
     altera_nome_colunas = {
         "ID do Cliente": "ID_CLIENTE",
         "Nome da Pessoa": "NOME_PESSOA",
+        "ID do Fornecedor": "ID_FORNECEDOR",
+        "Fornecedor": "NOME_FORNECEDOR",
+        "Data da Inspeção": "DATA_INSPECAO"
     }
 
     # Seleciona os dados de avaliação,
@@ -165,12 +188,15 @@ def TratarDataframe(
             df_tabela_dados = SchemaAvaliacaoForn.validate(df_tabela_dados)
 
     except SchemaError as e:
-        print(f"Falha na validação do esquema: {e}")
+        logger.error(f"Falha na validação do esquema: {e}")
+
+        raise SystemExit()
 
     return nome_arquivo, df_tabela_dados
 
 
-def CarregarDadosBigQuery(dataframe: pd.DataFrame, nome_tabela: str):
+@capturar_erros
+def carregar_dados_bigquery(dataframe: pd.DataFrame, nome_tabela: str):
     """
     Cria uma tabela no Google Big Query para gravar dados oriundos de um dataframe
     """
@@ -191,3 +217,6 @@ def CarregarDadosBigQuery(dataframe: pd.DataFrame, nome_tabela: str):
     )
 
     executa_chamada_api.result()
+
+    qtd_linhas = dataframe.shape[0]
+    logger.info(f"{qtd_linhas} linhas carregadas na tabela {nome_tabela} do dataset {id_conjunto_dados_bigquery}.")
