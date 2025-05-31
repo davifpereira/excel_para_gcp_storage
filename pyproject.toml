@@ -46,7 +46,7 @@ black .
 kill = "kill -9 $(lsof -t -i :8000)"
 test = "pytest -v"
 run = """
-poetry run python app/main.py
+poetry run python dags/main.py
 """
 doc = "mkdocs serve"
 
