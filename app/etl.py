@@ -1,26 +1,64 @@
 import os
-
 import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import bigquery
 from pandera.errors import SchemaError
-
+from functools import wraps
 from app.schema import SchemaAvaliacaoForn, SchemaClassifCredito
+import logging
 
 load_dotenv()
 
 id_conjunto_dados_bigquery = os.getenv("ID_CONJUNTO_DADOS_BIGQUERY")
 
+logger = logging.getLogger("airflow.task")
+
 ##### Funções
 
+def capturar_erros(funcao):
+    '''
+    Responsável pelo mapeamento dos eventuais erros que podem ocorrer durante o processo.
 
-def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
-    """
-    Função destinada a leitura primária do arquivo Excel,
-    cujo objetivo é retornar um dicionario contendo alguns metadados e
-    um dataframe com os dados tabulares
-    """
+    Parameters:
+        funcao (function): caminho do arquivo Excel contendo os dados da avaliação.
 
+    Returns:
+        retorna a função original encapsulada com o tratamento de erros.
+    '''
+
+    @wraps(funcao)
+    def wrapper(*args, **kwargs):
+        try:
+
+            return funcao(*args, **kwargs)
+        
+        except Exception as e:
+
+            logger.error(f"Ocorreu um erro na função '{funcao.__name__}':\n\n{e}")
+
+            raise SystemExit()
+
+    return wrapper
+
+
+def ler_arquivo(caminho: str, aba: str, coluna_dados: str) -> dict:
+    """
+    Lê um arquivo Excel e extrai tanto os dados tabulares quanto os metadados da avaliação.
+
+    Parameters:
+        caminho (str): caminho do arquivo Excel contendo os dados da avaliação.
+        aba (str): nome da aba que contém os dados;
+        coluna_dados (str): valor presente na célula de cabeçalho que indica onde começa a tabela de dados.
+
+    Returns:
+        conteudo_planilha (dict): contém tanto os metadados das avaliações quanto o dataframe de dados, propriamente. 
+        Seus elementos são:
+            - Data da avaliação;
+            - Nome do revisor;
+            - Dados tabulares;
+            - Caminho do arquivo.      
+    """
+    
     df = pd.read_excel(caminho, sheet_name=aba, header=None, dtype=str)
 
     conteudo_planilha = {}
@@ -72,23 +110,39 @@ def LerArquivo(caminho: str, aba: str, coluna_dados: str) -> pd.DataFrame:
     return conteudo_planilha
 
 
-def TratarDataframe(
+@capturar_erros
+def tratar_dataframe(
     conteudo: dict, colunas_base: list, colunas_valores: list, nome_tabela: dict
-) -> pd.DataFrame:
+) -> tuple[str, pd.DataFrame]:
     """
-    É resposável pelo tratamento dos dados com base nestas ações:
+    É resposável pelo tratamento dos dados e, portanto, executa estas ações:
 
-    - Elabora um dataframe para concetrar o peso percentual da avaliação de cada agente;
-    - Delimita o dataframe principal (aquele que contém os dados das avaliações, propriamente);
-    - Transforma as colunas de agentes e suas avaliações em linhas (unpivot);
-    - Realiza o merge do dataframe principal com o de pesos percentuais;
-    - Inclui duas colunas no dataframe: data de avaliação e revisor.
+    - Cria um dataframe com os pesos percentuais de cada agente;
+    - Realiza o unpivot dos dados de avaliação;
+    - Faz o merge dos dados de avaliação com os pesos;
+    - Insere colunas de data da avaliação e revisor;
+    - Define o nome da tabela de destino;
+    - Realiza a validação dos dados de acordo com o schema.
+
+    Parameters:
+        conteudo (dict): dicionário obtido pelo retorno da função ler_arquivo.
+        colunas_base (list): lista de colunas que permanecerão fixas durante o processo de unpivot.
+        colunas_valores (list): lista de colunas que serão transformadas em linhas no processo de unpivot.
+        nome_tabela (dict): dicionário que contempla a relação entre o caminho do arquivo e o nome base da tabela no BigQuery.
+
+    Returns:
+        tuple[str, pd.DataFrame]:
+            nome_arquivo (str): nome final da tabela no BigQuery (incluindo a data no sufixo).
+            df_tabela_dados (pd.DataFrame): dataframe tratado e validado, pronto para ser carregado no BigQuery.
     """
 
     # Dicionário que será destinado à alteração do nome das colunas
     altera_nome_colunas = {
         "ID do Cliente": "ID_CLIENTE",
         "Nome da Pessoa": "NOME_PESSOA",
+        "ID do Fornecedor": "ID_FORNECEDOR",
+        "Fornecedor": "NOME_FORNECEDOR",
+        "Data da Inspeção": "DATA_INSPECAO"
     }
 
     # Seleciona os dados de avaliação,
@@ -165,14 +219,24 @@ def TratarDataframe(
             df_tabela_dados = SchemaAvaliacaoForn.validate(df_tabela_dados)
 
     except SchemaError as e:
-        print(f"Falha na validação do esquema: {e}")
+        logger.error(f"Falha na validação do esquema: {e}")
+
+        raise SystemExit()
 
     return nome_arquivo, df_tabela_dados
 
 
-def CarregarDadosBigQuery(dataframe: pd.DataFrame, nome_tabela: str):
+@capturar_erros
+def carregar_dados_bigquery(dataframe: pd.DataFrame, nome_tabela: str):
     """
-    Cria uma tabela no Google Big Query para gravar dados oriundos de um dataframe
+    A partir de um dataframe, carrega dados numa tabela do Google Big Query, sobrescrevendo-a caso já exista.
+
+    Parameters:
+        dataframe (pd.DataFrame): dataframe contendo dados tratados e validados, prontos para serem carregados no BigQuery.
+        nome_tabela (str): nome da tabela de destino no BigQuery.
+
+    Returns:
+        None
     """
 
     client = bigquery.Client()
@@ -191,3 +255,6 @@ def CarregarDadosBigQuery(dataframe: pd.DataFrame, nome_tabela: str):
     )
 
     executa_chamada_api.result()
+
+    qtd_linhas = dataframe.shape[0]
+    logger.info(f"{qtd_linhas} linhas carregadas na tabela {nome_tabela} do dataset {id_conjunto_dados_bigquery}.")

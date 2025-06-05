@@ -2,11 +2,11 @@ from datetime import date
 
 import pandas as pd
 
-from app.etl import TratarDataframe
+from app.etl import tratar_dataframe
 
 
 # Teste da segunda função do script main
-def test_TratarDataframe():
+def test_tratar_dataframe():
 
     df = pd.DataFrame(
         [
@@ -37,7 +37,7 @@ def test_TratarDataframe():
     colunas_valores = ["Analista 1", "Analista 2", "Gerente", "Score Externo"]
 
     # Nome da tabela e dataframe resultante da aplicação da função
-    nome_arquivo_resultante, df_resultante = TratarDataframe(
+    nome_arquivo_resultante, df_resultante = tratar_dataframe(
         conteudo=conteudo,
         colunas_base=colunas_base,
         colunas_valores=colunas_valores,

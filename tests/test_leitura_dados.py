@@ -1,17 +1,17 @@
 from datetime import date
 from pathlib import Path
 
-from app.etl import LerArquivo
+from app.etl import ler_arquivo
 
 
 # Teste da primeira função do script main
-def test_LerArquivo():
+def test_ler_arquivo():
 
     # Usa o arquivo excel de exemplo presente nesta pasta
     caminho_pasta = Path(__file__).parent
     caminho_arquivo = caminho_pasta / "exemplo.xlsx"
 
-    resultado = LerArquivo(
+    resultado = ler_arquivo(
         caminho=caminho_arquivo, aba="Sheet1", coluna_dados="ID do Cliente"
     )
 
