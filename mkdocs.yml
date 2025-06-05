@@ -1,4 +1,7 @@
-site_name: My Docs
+site_name: Projeto de ETL -> Excel para BigQuery
+
+theme:
+    name: material
 
 plugins:
     - search
