@@ -29,9 +29,9 @@ dependencies = [
 
 [tool.poetry]
 packages = [
+    { include = "excel_para_gcp_storage" },
     { include = "app" }
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -47,7 +47,7 @@ isort .
 black .
 """
 kill = "kill -9 $(lsof -t -i :8000)"
-test = "pytest -v"
+test = """poetry run pytest -v"""
 run = """
 poetry run python dags/main.py
 """

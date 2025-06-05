@@ -23,4 +23,4 @@ jobs:
               run: poetry run pytest tests -v
 
             - name: Criar ou atualizar o site no Github Pages para documentação desenvolvida no MkDocs
-              run: poetry run mkdocs gh-deploy
+              run: poetry run mkdocs gh-deploy --force
