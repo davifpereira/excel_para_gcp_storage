@@ -29,7 +29,6 @@ dependencies = [
 
 [tool.poetry]
 packages = [
-    { include = "excel_para_gcp_storage" },
     { include = "app" }
 ]
 
