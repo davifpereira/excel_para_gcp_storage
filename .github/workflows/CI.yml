@@ -21,3 +21,6 @@ jobs:
 
             - name: Rodar minha rotina de testes com o Poetry
               run: poetry run pytest tests -v
+
+            - name: Criar ou atualizar o site no Github Pages para documentação desenvolvida no MkDocs
+              run: poetry run mkdocs gh-deploy
