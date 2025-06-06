@@ -24,4 +24,5 @@ Por meio de um pipeline totalmente automatizado, este projeto realiza:
 - **Docker** - É quem containeriza o ambiente do Airflow, garantindo portabilidade e reprodutibilidade;
 
 - **Google BigQuery** - Data Warehouse auto gerenciável na nuvem, onde os dados finais são armazenados.
-
+---
+### **Visite a documentação técnica neste [link](https://davifpereira.github.io/excel_para_gcp_storage/).**
